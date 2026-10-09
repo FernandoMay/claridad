@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "claridad-db",
-      "database_id": "local-dev-placeholder"
+      "database_id": "fae11edf-d0d7-4bae-be0c-cf05baf9811f"
     }
   ],
   "observability": { "enabled": true }
