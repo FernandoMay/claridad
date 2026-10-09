@@ -1,0 +1,17 @@
+{
+  "name": "claridad",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Claridad — coordinador de atención personal: briefing diario, deduplicado y trazable. POC con Cloudflare Workers + D1.",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 execute claridad-db --local --file=./schema.sql",
+    "db:seed:local": "wrangler d1 execute claridad-db --local --file=./seed.sql",
+    "db:reset:local": "npm run db:migrate:local && npm run db:seed:local"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

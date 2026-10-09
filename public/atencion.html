@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claridad — Atención</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.PALETTE = {
+      "primary": "#10533f", "primary-container": "#2e6b56", "on-primary": "#ffffff",
+      "on-primary-container": "#aae9ce", "primary-fixed": "#b1f0d5", "primary-fixed-dim": "#95d3ba",
+      "on-primary-fixed": "#002116", "on-primary-fixed-variant": "#0d513d",
+      "secondary": "#904d00", "on-secondary": "#ffffff", "secondary-container": "#fe932c",
+      "on-secondary-container": "#663500", "secondary-fixed": "#ffdcc3", "secondary-fixed-dim": "#ffb77d",
+      "on-secondary-fixed": "#2f1500", "on-secondary-fixed-variant": "#6e3900",
+      "tertiary": "#274785", "on-tertiary": "#ffffff", "tertiary-container": "#415f9e",
+      "on-tertiary-container": "#cfdbff", "tertiary-fixed": "#d9e2ff", "tertiary-fixed-dim": "#afc6ff",
+      "on-tertiary-fixed": "#001944", "on-tertiary-fixed-variant": "#254583",
+      "surface": "#fff8f3", "surface-dim": "#e2d8cf",
+      "surface-container-lowest": "#ffffff", "surface-container-low": "#fcf2e8",
+      "surface-container": "#f6ece3", "surface-container-high": "#f0e7dd",
+      "surface-container-highest": "#ebe1d8",
+      "on-surface": "#1f1b15", "on-surface-variant": "#404944",
+      "outline": "#707974", "outline-variant": "#bfc9c3",
+      "error": "#ba1a1a", "on-error": "#ffffff",
+    };
+    tailwind.config = {
+      theme: { extend: {
+        colors: PALETTE,
+        spacing: { "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "space-lg": "1.5rem", "space-xl": "2.5rem", "margin": "1.25rem" },
+        fontFamily: { sans: ["Inter"], serif: ["Newsreader"] },
+        borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+      } },
+    };
+  </script>
+  <style>html,body{margin:0;background:#fff8f3;} body{-webkit-tap-highlight-color:transparent;} ::-webkit-scrollbar{display:none;}</style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+  <header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(31,27,21,0.03)]">
+    <div class="h-16 px-space-lg flex items-center justify-between">
+      <div class="flex items-center gap-space-sm">
+        <span class="w-7 h-7 rounded-lg bg-primary text-on-primary font-serif flex items-center justify-center">C</span>
+        <div class="flex flex-col">
+          <span class="font-serif text-[20px] leading-6 text-on-surface tracking-tight">Claridad</span>
+          <span class="font-sans text-[11px] text-on-surface-variant/80">Santuario cognitivo</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col gap-space-md px-space-lg pt-24 pb-24 bg-surface">
+    <section>
+      <h1 class="font-serif text-2xl text-on-surface m-0 mb-1">Tu atención como recurso protegido</h1>
+      <p class="font-sans text-[13px] text-on-surface-variant m-0">
+        Entregas asíncronas, filtrado consciente y silencio deliberado — sin ocultar nada sin recuperarlo.
+      </p>
+    </section>
+
+    <section class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+      <div class="flex items-center justify-between">
+        <span class="font-sans text-[11px] uppercase tracking-wider font-semibold text-on-surface-variant">Horario de entrega serena</span>
+        <span class="font-sans text-[10px] bg-primary-fixed/40 text-on-primary-fixed-variant px-2 py-0.5 rounded-full font-semibold">Batching activo</span>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <label class="font-sans text-sm text-on-surface" for="quiet-start">Ventana de silencio</label>
+        <div class="flex items-center gap-2">
+          <input id="quiet-start" type="time" value="20:00" class="bg-surface-container rounded-lg px-2 py-1 font-sans text-sm" />
+          <span class="font-sans text-on-surface-variant">→</span>
+          <input id="quiet-end" type="time" value="07:00" class="bg-surface-container rounded-lg px-2 py-1 font-sans text-sm" />
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <label class="font-sans text-sm text-on-surface" for="urgencia">Umbral de urgencia</label>
+        <select id="urgencia" class="bg-surface-container rounded-lg px-2 py-1 font-sans text-sm">
+          <option value="severa" selected>Severo — solo seguridad, salud o trámites personales</option>
+          <option value="moderada">Moderado — incluye temas personales directos</option>
+          <option value="todas">Todas las interrupciones</option>
+        </select>
+      </div>
+      <button id="save-focus" type="button"
+        class="w-full h-11 bg-primary text-on-primary rounded-lg font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors">
+        <span class="material-symbols-outlined" style="font-size:18px">spa</span> Guardar preferencias
+      </button>
+      <p id="focus-status" class="font-sans text-xs text-primary text-center m-0" hidden>Preferencias guardadas</p>
+    </section>
+
+    <section class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-1 mt-space-sm">
+      <div class="flex items-center gap-1.5 text-secondary">
+        <span class="material-symbols-outlined" style="font-size:18px">local_florist</span>
+        <span class="font-sans text-[11px] uppercase tracking-wider font-semibold">Pauta de reflexión</span>
+      </div>
+      <blockquote class="font-serif text-lg italic text-on-surface m-0">
+        “Estar informado no requiere saber todo lo que ocurre a cada minuto. Requiere comprender lo que verdaderamente importa.”
+      </blockquote>
+    </section>
+  </main>
+
+  <nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(31,27,21,0.04)]">
+    <div class="flex justify-around items-center h-16 px-space-sm">
+      <a href="/index.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">newspaper</span><span class="font-sans text-xs mt-0.5">Briefing</span>
+      </a>
+      <a href="/explorar.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">explore</span><span class="font-sans text-xs mt-0.5">Explorar</span>
+      </a>
+      <a href="/fuentes.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">verified</span><span class="font-sans text-xs mt-0.5">Fuentes</span>
+      </a>
+      <a href="/atencion.html" class="flex flex-col items-center justify-center w-16 text-primary font-semibold" aria-current="page">
+        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">spa</span><span class="font-sans text-xs mt-0.5">Atención</span>
+      </a>
+    </div>
+  </nav>
+
+  <script>
+    (async function boot() {
+      const qs = (s) => document.querySelector(s);
+      try {
+        const { focus } = await (await fetch('/api/focus')).json();
+        if (focus) {
+          qs('#quiet-start').value = focus.quiet_start;
+          qs('#quiet-end').value = focus.quiet_end;
+          qs('#urgencia').value = focus.urgencia;
+        }
+      } catch (err) { console.error(err); }
+      qs('#save-focus').addEventListener('click', async () => {
+        const p = new URLSearchParams({
+          quiet_start: qs('#quiet-start').value,
+          quiet_end: qs('#quiet-end').value,
+          urgencia: qs('#urgencia').value,
+        });
+        try {
+          await fetch('/api/focus?' + p, { method: 'PATCH' });
+          const st = qs('#focus-status');
+          st.hidden = false;
+          setTimeout(() => (st.hidden = true), 1800);
+        } catch (err) { console.error(err); }
+      });
+    })();
+  </script>
+</body>
+</html>

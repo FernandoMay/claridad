@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claridad — Fuentes</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.PALETTE = {
+      "primary": "#10533f", "primary-container": "#2e6b56", "on-primary": "#ffffff",
+      "on-primary-container": "#aae9ce", "primary-fixed": "#b1f0d5", "primary-fixed-dim": "#95d3ba",
+      "on-primary-fixed": "#002116", "on-primary-fixed-variant": "#0d513d",
+      "secondary": "#904d00", "on-secondary": "#ffffff", "secondary-container": "#fe932c",
+      "on-secondary-container": "#663500", "secondary-fixed": "#ffdcc3", "secondary-fixed-dim": "#ffb77d",
+      "on-secondary-fixed": "#2f1500", "on-secondary-fixed-variant": "#6e3900",
+      "tertiary": "#274785", "on-tertiary": "#ffffff", "tertiary-container": "#415f9e",
+      "on-tertiary-container": "#cfdbff", "tertiary-fixed": "#d9e2ff", "tertiary-fixed-dim": "#afc6ff",
+      "on-tertiary-fixed": "#001944", "on-tertiary-fixed-variant": "#254583",
+      "surface": "#fff8f3", "surface-dim": "#e2d8cf",
+      "surface-container-lowest": "#ffffff", "surface-container-low": "#fcf2e8",
+      "surface-container": "#f6ece3", "surface-container-high": "#f0e7dd",
+      "surface-container-highest": "#ebe1d8",
+      "on-surface": "#1f1b15", "on-surface-variant": "#404944",
+      "outline": "#707974", "outline-variant": "#bfc9c3",
+      "error": "#ba1a1a", "on-error": "#ffffff",
+    };
+    tailwind.config = {
+      theme: { extend: {
+        colors: PALETTE,
+        spacing: { "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "space-lg": "1.5rem", "space-xl": "2.5rem", "margin": "1.25rem" },
+        fontFamily: { sans: ["Inter"], serif: ["Newsreader"] },
+        borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+      } },
+    };
+  </script>
+  <style>html,body{margin:0;background:#fff8f3;} body{-webkit-tap-highlight-color:transparent;} ::-webkit-scrollbar{display:none;}</style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+  <header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(31,27,21,0.03)]">
+    <div class="h-16 px-space-lg flex items-center justify-between">
+      <div class="flex items-center gap-space-sm">
+        <span class="w-7 h-7 rounded-lg bg-primary text-on-primary font-serif flex items-center justify-center">C</span>
+        <div class="flex flex-col">
+          <span class="font-serif text-[20px] leading-6 text-on-surface tracking-tight">Claridad</span>
+          <span class="font-sans text-[11px] text-on-surface-variant/80">Fuentes de confianza</span>
+        </div>
+      </div>
+      <div class="font-sans text-xs text-primary font-semibold" id="sources-count">0 activas</div>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col gap-space-md px-space-lg pt-24 pb-24 bg-surface">
+    <p class="font-serif text-lg italic text-on-surface-variant m-0 max-w-prose">
+      Cada fuente declara su rigor y se audita en cada briefing. Pausar una fuente no borra su historial: solo detiene su ingesta.
+    </p>
+    <section id="sources-list" class="flex flex-col gap-space-sm"></section>
+
+    <section class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-1 mt-2">
+      <span class="font-sans text-[11px] uppercase tracking-wider font-semibold text-secondary">Principio de trazabilidad</span>
+      <p class="font-serif text-base text-on-surface m-0">
+        "Ninguna afirmación entra en tu briefing sin enlace directo a su origen o a una corroboración independiente."
+      </p>
+    </section>
+  </main>
+
+  <nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(31,27,21,0.04)]">
+    <div class="flex justify-around items-center h-16 px-space-sm">
+      <a href="/index.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">newspaper</span><span class="font-sans text-xs mt-0.5">Briefing</span>
+      </a>
+      <a href="/explorar.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">explore</span><span class="font-sans text-xs mt-0.5">Explorar</span>
+      </a>
+      <a href="/fuentes.html" class="flex flex-col items-center justify-center w-16 text-primary font-semibold" aria-current="page">
+        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">verified</span><span class="font-sans text-xs mt-0.5">Fuentes</span>
+      </a>
+      <a href="/atencion.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">spa</span><span class="font-sans text-xs mt-0.5">Atención</span>
+      </a>
+    </div>
+  </nav>
+
+  <script>
+    (async function boot() {
+      const qs = (s) => document.querySelector(s);
+      const META = {
+        agencia: ['Agencia', 'bg-primary-fixed/50 text-on-primary-fixed-variant'],
+        'fact-check': ['Fact-check', 'bg-secondary-fixed text-on-secondary-fixed'],
+        primaria: ['Primaria', 'bg-tertiary-fixed text-on-tertiary-fixed'],
+        contextual: ['Contextual', 'bg-surface-container-high text-on-surface'],
+      };
+      try {
+        const { sources } = await (await fetch('/api/sources')).json();
+        const host = qs('#sources-list');
+        host.replaceChildren();
+        for (const s of sources) {
+          const [cat, cls] = META[s.category] || [s.category, 'bg-surface-container text-on-surface-variant'];
+          const card = document.createElement('article');
+          card.id = 's-' + s.slug;
+          card.className = 'bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex items-center justify-between gap-2 scroll-mt-20';
+          const left = document.createElement('div');
+          left.className = 'flex flex-col min-w-0 flex-1';
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-1.5 flex-wrap';
+          row.innerHTML = '<span class="font-sans text-sm font-semibold text-on-surface"></span>' +
+            '<span class="px-1.5 py-0.5 rounded font-sans text-[10px] font-semibold"></span>' +
+            '<span class="font-sans text-[10px] text-primary font-semibold"></span>';
+          row.children[0].textContent = s.name;
+          row.children[1].textContent = cat; row.children[1].className += ' ' + cls;
+          row.children[2].textContent = s.rigor + '% rigor';
+          const desc = document.createElement('p');
+          desc.className = 'font-sans text-xs text-on-surface-variant truncate';
+          desc.textContent = (s.description || '') + ' \u00b7 citada en ' + s.cited_in_topics + ' tema(s)';
+          left.append(row, desc);
+          const active = !!s.active;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.setAttribute('aria-pressed', String(active));
+          btn.className = 'w-12 h-7 rounded-full p-0.5 transition-colors flex items-center shrink-0 ' +
+            (active ? 'bg-primary justify-end' : 'bg-surface-container-highest justify-start');
+          const knob = document.createElement('span');
+          knob.className = 'w-6 h-6 bg-surface-container-lowest rounded-full shadow-sm';
+          btn.append(knob);
+          btn.addEventListener('click', () => {
+            const now = btn.getAttribute('aria-pressed') !== 'true';
+            btn.setAttribute('aria-pressed', String(now));
+            btn.classList.toggle('bg-primary', now);
+            btn.classList.toggle('justify-end', now);
+            btn.classList.toggle('bg-surface-container-highest', !now);
+            btn.classList.toggle('justify-start', !now);
+            updateCount();
+          });
+          card.append(left, btn);
+          host.append(card);
+        }
+        updateCount();
+      } catch (err) {
+        console.error(err);
+        qs('#sources-list').textContent = 'No se pudo cargar las fuentes. \u00bfEst\u00e1 corriendo npm run dev?';
+      }
+    })();
+    function updateCount() {
+      const active = document.querySelectorAll('[aria-pressed="true"]').length;
+      const el = document.querySelector('#sources-count');
+      if (el) el.textContent = active + ' activas';
+    }
+  </script>
+</body>
+</html>

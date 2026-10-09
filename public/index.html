@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Claridad — Briefing</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/tokens.js"></script>
+  <script>
+    tailwind.config = { darkMode: "class", theme: { extend: {
+      colors: window.PALETTE,
+      spacing: { "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "space-lg": "1.5rem", "space-xl": "2.5rem", "margin": "1.25rem" },
+      fontFamily: { sans: ["Inter"], serif: ["Newsreader"] },
+      fontSize: window.SIZES,
+      borderRadius: window.RADII,
+    } } };
+  </script>
+  <style>
+    html, body { margin: 0; padding: 0; background-color: #fff8f3; }
+    body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+  <header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(31,27,21,0.03)]">
+    <div class="h-20 px-space-lg flex items-center justify-between">
+      <div class="flex items-center gap-space-sm">
+        <span class="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-serif text-lg">C</span>
+        <div class="flex flex-col justify-center">
+          <span class="font-serif text-[22px] leading-8 text-on-surface tracking-tight">Claridad</span>
+          <span class="font-sans text-xs text-on-surface-variant/80" id="edition-line">Edición matutina</span>
+        </div>
+      </div>
+      <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-fixed/40 text-on-primary-fixed-variant">
+        <span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+        <span class="font-sans text-[10px] font-semibold tracking-wide uppercase" id="status-pill">Sintetizado</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col relative w-full pt-24 pb-24 px-space-lg bg-surface gap-space-lg">
+    <p class="font-serif text-lg text-on-surface-italic italic text-on-surface-variant max-w-prose" id="greeting">
+      Tu panorama está listo. No hay urgencias artificiales.
+    </p>
+
+    <section id="atencion" class="flex flex-col gap-space-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="font-serif text-[19px] font-medium text-on-surface">Atención requerida</h2>
+        <span class="font-sans text-xs text-on-surface-variant font-medium">Acción pendiente</span>
+      </div>
+      <div id="topic-attention" class="flex flex-col gap-space-sm"></div>
+    </section>
+
+    <section id="novedades" class="flex flex-col gap-space-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="font-serif text-[19px] font-medium text-on-surface">Temas con novedades</h2>
+        <span class="font-sans text-xs text-on-surface-variant font-medium">Deduplicado</span>
+      </div>
+      <div id="topic-novedades" class="flex flex-col gap-space-sm"></div>
+    </section>
+
+    <section id="fondo" class="flex flex-col gap-space-sm">
+      <div class="flex items-center justify-between">
+        <h2 class="font-serif text-[19px] font-medium text-on-surface">Para profundizar</h2>
+        <span class="font-sans text-xs text-on-surface-variant font-medium">Lectura de fondo</span>
+      </div>
+      <div id="topic-fondo" class="flex flex-col gap-space-sm"></div>
+    </section>
+  </main>
+
+  <nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_12px_rgba(31,27,21,0.04)]">
+    <div class="flex justify-around items-center h-16 px-space-sm">
+      <a href="/index.html" class="flex flex-col items-center justify-center w-16 text-primary font-semibold" aria-current="page">
+        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">newspaper</span>
+        <span class="font-sans text-xs mt-0.5">Briefing</span>
+      </a>
+      <a href="/explorar.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">explore</span>
+        <span class="font-sans text-xs mt-0.5">Explorar</span>
+      </a>
+      <a href="/fuentes.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">verified</span>
+        <span class="font-sans text-xs mt-0.5">Fuentes</span>
+      </a>
+      <a href="/atencion.html" class="flex flex-col items-center justify-center w-16 text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">spa</span>
+        <span class="font-sans text-xs mt-0.5">Atención</span>
+      </a>
+    </div>
+  </nav>
+
+  <script>
+    (async function boot() {
+      const qs = (s) => document.querySelector(s);
+      try {
+        const { topics } = await (await fetch('/api/topics')).json();
+        const hosts = { atencion: qs('#topic-attention'), novedad: qs('#topic-novedades'), fondo: qs('#topic-fondo') };
+        const badges = {
+          atencion: ['Atenci\u00f3n requerida', 'bg-secondary-fixed text-on-secondary-fixed'],
+          novedad: ['Novedad', 'bg-tertiary-fixed text-on-tertiary-fixed'],
+          fondo: ['Lectura de fondo', 'bg-surface-container-high text-on-surface'],
+        };
+        const byStatus = { atencion: [], novedad: [], fondo: [] };
+        topics.forEach(t => (byStatus[t.status] || byStatus.novedad).push(t));
+        for (const [status, list] of Object.entries(byStatus)) {
+          const host = hosts[status];
+          if (!host) continue;
+          host.replaceChildren(...list.map(t => {
+            const [label, cls] = badges[t.status] || ['Informativo', 'bg-surface-container text-on-surface-variant'];
+            const card = document.createElement('article');
+            card.className = 'bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm';
+            const chips = document.createElement('div');
+            chips.className = 'flex flex-wrap items-center gap-1.5';
+            chips.innerHTML = '<span class="px-2 py-0.5 rounded-full font-sans text-[10px] font-semibold ' + cls + '"></span>' +
+              (t.deadline ? '<span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-sans text-[10px]">Entra en vigor: ' + t.deadline + '</span>' : '') +
+              (t.dedup_count > 0 ? '<span class="font-sans text-[10px] text-primary">' + t.dedup_count + ' art\u00edculos redundantes condensados</span>' : '');
+            chips.firstChild.textContent = label;
+            const link = document.createElement('a');
+            link.href = '/articulo.html?topic=' + t.slug;
+            link.className = 'block no-underline';
+            link.innerHTML = '<h3 class="font-serif text-[19px] text-on-surface leading-snug m-0"></h3><p class="font-sans text-[13px] text-on-surface-variant m-0 mt-1"></p>';
+            link.querySelector('h3').textContent = t.title;
+            link.querySelector('p').textContent = t.summary || '';
+            const meta = document.createElement('div');
+            meta.className = 'flex items-center justify-between pt-1';
+            meta.innerHTML = '<span class="font-sans text-[10px] text-on-surface-variant"></span><span class="font-sans text-xs text-primary font-semibold">Ver matices \u2192</span>';
+            meta.firstChild.textContent = t.sources_count + ' fuentes sintetizadas';
+            card.append(chips, link, meta);
+            return card;
+          }));
+        }
+        const nAt = byStatus.atencion.length;
+        qs('#greeting').textContent = nAt > 0
+          ? 'Tienes ' + nAt + ' asunto' + (nAt > 1 ? 's' : '') + ' que requiere' + (nAt > 1 ? 'n' : '') + ' tu atenci\u00f3n. El resto puede esperar a la pr\u00f3xima ventana de entrega.'
+          : 'Todo al d\u00eda. No hay asuntos urgentes: tu pr\u00f3xima s\u00edntesis llegar\u00e1 a las 19:00.';
+      } catch (err) {
+        console.error(err);
+        qs('#greeting').textContent = 'No se pudo cargar el briefing (\u00bfest\u00e1 corriendo npm run dev?).';
+      }
+    })();
+  </script>
+</body>
+</html>

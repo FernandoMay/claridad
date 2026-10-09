@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claridad — Lectura atenta</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tokens compartidos (mismos valores de tokens.js, evitando un fetch extra al SSR de ninguna página).
+    window.PALETTE = {
+      "primary": "#10533f", "primary-container": "#2e6b56", "on-primary": "#ffffff",
+      "on-primary-container": "#aae9ce", "primary-fixed": "#b1f0d5", "primary-fixed-dim": "#95d3ba",
+      "on-primary-fixed": "#002116", "on-primary-fixed-variant": "#0d513d",
+      "secondary": "#904d00", "on-secondary": "#ffffff", "secondary-container": "#fe932c",
+      "on-secondary-container": "#663500", "secondary-fixed": "#ffdcc3", "secondary-fixed-dim": "#ffb77d",
+      "on-secondary-fixed": "#2f1500", "on-secondary-fixed-variant": "#6e3900",
+      "tertiary": "#274785", "on-tertiary": "#ffffff", "tertiary-container": "#415f9e",
+      "on-tertiary-container": "#cfdbff", "tertiary-fixed": "#d9e2ff", "tertiary-fixed-dim": "#afc6ff",
+      "on-tertiary-fixed": "#001944", "on-tertiary-fixed-variant": "#254583",
+      "surface": "#fff8f3", "surface-dim": "#e2d8cf", "surface-bright": "#fff8f3",
+      "surface-container-lowest": "#ffffff", "surface-container-low": "#fcf2e8",
+      "surface-container": "#f6ece3", "surface-container-high": "#f0e7dd",
+      "surface-container-highest": "#ebe1d8", "surface-variant": "#ebe1d8",
+      "on-surface": "#1f1b15", "on-surface-variant": "#404944",
+      "outline": "#707974", "outline-variant": "#bfc9c3",
+      "error": "#ba1a1a", "on-error": "#ffffff", "error-container": "#ffdad6", "on-error-container": "#93000a",
+    };
+    window.SIZES = {
+      "label-sm": ["10px", "14px", "0.04em", 600],
+      "body-sm":  ["13px", "20px", "0.005em", 400],
+      "body-lg":  ["18px", "30px", "-0.005em", 400],
+      "label-lg": ["14px", "20px", "0.01em", 600],
+      "label-md": ["12px", "16px", "0.02em", 500],
+      "headline-sm": ["19px", "26px", "0em", 500],
+      "body-md":  ["15px", "24px", "0em", 400],
+      "headline-md": ["22px", "30px", "-0.01em", 500],
+    };
+    tailwind.config = {
+      theme: { extend: {
+        colors: PALETTE,
+        spacing: { "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "space-lg": "1.5rem", "space-xl": "2.5rem", "margin": "1.25rem" },
+        fontFamily: { sans: ["Inter"], serif: ["Newsreader"] },
+        borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+      } },
+    };
+  </script>
+  <style>html,body{margin:0;background:#fff8f3;} body{-webkit-tap-highlight-color:transparent;} ::-webkit-scrollbar{display:none;}</style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+  <header class="fixed top-0 w-full z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(31,27,21,0.03)]">
+    <div class="h-16 px-space-lg flex items-center gap-space-sm">
+      <a href="/index.html" class="material-symbols-outlined text-on-surface hover:text-primary transition-colors" aria-label="Volver">arrow_back</a>
+      <span class="w-7 h-7 rounded-lg bg-primary text-on-primary font-serif flex items-center justify-center">C</span>
+      <h1 class="font-serif text-[19px] font-medium text-on-surface truncate flex-1">Ficha verificada</h1>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col gap-space-md px-space-lg pt-24 pb-12 bg-surface" id="article-root">
+    <p class="font-sans text-on-surface-variant">Cargando ficha…</p>
+  </main>
+
+  <script>
+    (async function boot() {
+      const root = document.getElementById('article-root');
+      const slug = new URLSearchParams(location.search).get('topic') || 'privacidad-digital';
+      try {
+        const { topic, facts, sources } = await (await fetch('/api/topics/' + slug)).json();
+        if (!topic) throw new Error(404);
+        document.title = topic.title + ' \u2014 Claridad';
+        const KIND = {
+          cambio: ['Qu\u00e9 cambi\u00f3', 'bg-primary-fixed/30 text-on-primary-fixed-variant'],
+          evidencia: ['Evidencia', 'bg-primary-fixed/30 text-on-primary-fixed-variant'],
+          accion: ['Acci\u00f3n recomendada', 'bg-secondary-fixed text-on-secondary-fixed'],
+          hecho: ['Hecho confirmado', 'bg-primary-fixed/30 text-on-primary-fixed-variant'],
+          discrepancia: ['Discrepancia', 'bg-secondary-fixed text-on-secondary-fixed'],
+        };
+        const CONF = {
+          alta: ['Alta confianza', 'bg-primary/10 text-primary'],
+          media: ['Confianza media', 'bg-surface-container text-on-surface-variant'],
+          disputa: ['En disputa', 'bg-secondary-container/20 text-on-secondary-fixed-variant'],
+        };
+        root.replaceChildren();
+        const tag = document.createElement('p');
+        tag.className = 'font-sans text-xs uppercase tracking-wider font-semibold text-primary';
+        tag.textContent = 'Trazabilidad y hechos confirmados';
+        const h1 = document.createElement('h1');
+        h1.className = 'font-serif text-3xl text-on-surface leading-snug mt-2';
+        h1.textContent = topic.title;
+        const p = document.createElement('p');
+        p.className = 'font-sans text-[15px] text-on-surface-variant';
+        p.textContent = topic.summary || '';
+        root.append(tag, h1, p);
+        const factsHost = document.createElement('div');
+        factsHost.className = 'flex flex-col gap-3 mt-3';
+        for (const f of facts) {
+          const [kL, kC] = KIND[f.kind] || [f.kind, 'bg-surface-container text-on-surface-variant'];
+          const [cL, cC] = CONF[f.confidence] || CONF.media;
+          const box = document.createElement('div');
+          box.className = 'bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-2';
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between gap-2';
+          row.innerHTML = '<span class="px-2 py-0.5 rounded-full font-sans text-[10px] font-semibold"></span><span class="px-2 py-0.5 rounded-full font-sans text-[10px] font-semibold"></span>';
+          row.children[0].textContent = kL; row.children[0].className += ' ' + kC;
+          row.children[1].textContent = cL; row.children[1].className += ' ' + cC;
+          const detail = document.createElement('p');
+          detail.className = 'font-serif text-base text-on-surface leading-snug';
+          detail.textContent = f.label + ' \u2014 ' + (f.detail || '');
+          box.append(row, detail);
+          if (f.verification) {
+            const v = document.createElement('p');
+            v.className = 'font-sans text-[11px] text-primary';
+            v.textContent = '\u2714 ' + f.verification;
+            box.append(v);
+          }
+          factsHost.append(box);
+        }
+        root.append(factsHost);
+        const h2 = document.createElement('h2');
+        h2.className = 'font-serif text-[19px] text-on-surface mt-4';
+        h2.textContent = 'Fuentes primarias';
+        const chips = document.createElement('div');
+        chips.className = 'flex flex-wrap gap-1.5';
+        if (!sources.length) {
+          const none = document.createElement('span');
+          none.className = 'font-sans text-xs text-on-surface-variant';
+          none.textContent = 'Sin fuentes citadas a\u00fan.';
+          chips.append(none);
+        }
+        for (const s of sources) {
+          const c = document.createElement('a');
+          c.href = '/fuentes.html#s-' + s.slug;
+          c.className = 'inline-flex items-center gap-1 bg-tertiary-fixed text-on-tertiary-fixed px-2 py-1 rounded font-sans text-[11px] no-underline';
+          c.textContent = (s.reference || 'Fuente') + ' \u00b7 ' + s.name;
+          chips.append(c);
+        }
+        root.append(h2, chips);
+        const btn = document.createElement('button');
+        btn.className = 'mt-space-lg w-full h-12 bg-primary text-on-primary rounded-lg font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors';
+        btn.textContent = '\u2714 comprendido';
+        btn.addEventListener('click', async () => {
+          await fetch('/api/sessions?topic=' + topic.id + '&action=comprendido', { method: 'POST' });
+          btn.disabled = true;
+          btn.className = 'mt-space-lg w-full h-12 bg-surface-container-high text-on-surface rounded-lg font-sans text-sm font-semibold flex items-center justify-center';
+          btn.textContent = 'Comprendido \u2014 registrado';
+        });
+        root.append(btn);
+      } catch (err) {
+        console.error(err);
+        root.replaceChildren();
+        const msg = document.createElement('p');
+        msg.className = 'font-sans text-on-surface-variant';
+        msg.textContent = 'No se pudo cargar la ficha. \u00bfEst\u00e1 corriendo npm run dev?';
+        root.append(msg);
+      }
+    })();
+  </script>
+</body>
+</html>

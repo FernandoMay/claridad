@@ -1,0 +1,20 @@
+{
+  // $schema: "https://unpkg.com/wrangler/config-schema.json",
+  "name": "claridad",
+  "version": "0.1.0",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "claridad-db",
+      "database_id": "local-dev-placeholder"
+    }
+  ],
+  "observability": { "enabled": true }
+}
