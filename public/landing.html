@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Claridad — Menos ruido, más claridad</title>
+  <meta name="description" content="Reserva tu plaza en el pilotaje de Claridad: briefing personal, deduplicado y trazable." />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.PALETTE = {
+      "primary": "#10533f", "primary-container": "#2e6b56", "on-primary": "#ffffff",
+      "on-primary-container": "#aae9ce", "primary-fixed": "#b1f0d5", "primary-fixed-dim": "#95d3ba",
+      "on-primary-fixed": "#002116", "on-primary-fixed-variant": "#0d513d",
+      "secondary": "#904d00", "on-secondary": "#ffffff", "secondary-container": "#fe932c",
+      "on-secondary-container": "#663500", "secondary-fixed": "#ffdcc3", "secondary-fixed-dim": "#ffb77d",
+      "on-secondary-fixed": "#2f1500", "on-secondary-fixed-variant": "#6e3900",
+      "tertiary": "#274785", "on-tertiary": "#ffffff", "tertiary-container": "#415f9e",
+      "on-tertiary-container": "#cfdbff", "tertiary-fixed": "#d9e2ff", "tertiary-fixed-dim": "#afc6ff",
+      "on-tertiary-fixed": "#001944", "on-tertiary-fixed-variant": "#254583",
+      "surface": "#fff8f3", "surface-dim": "#e2d8cf",
+      "surface-container-lowest": "#ffffff", "surface-container-low": "#fcf2e8",
+      "surface-container": "#f6ece3", "surface-container-high": "#f0e7dd",
+      "surface-container-highest": "#ebe1d8",
+      "on-surface": "#1f1b15", "on-surface-variant": "#404944",
+      "outline": "#707974", "outline-variant": "#bfc9c3",
+      "error": "#ba1a1a", "on-error": "#ffffff", "error-container": "#ffdad6", "on-error-container": "#93000a",
+    };
+    tailwind.config = { theme: { extend: {
+      colors: window.PALETTE,
+      spacing: { "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "space-lg": "1.5rem", "space-xl": "2.5rem", "margin": "1.25rem" },
+      fontFamily: { sans: ["Inter"], serif: ["Newsreader"] },
+      borderRadius: { DEFAULT: "0.125rem", lg: "0.25rem", xl: "0.5rem", full: "0.75rem" },
+    } } };
+  </script>
+  <style>
+    html, body { margin: 0; padding: 0; background-color: #fff8f3; }
+    body { -webkit-tap-highlight-color: transparent; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+  <header class="w-full pt-safe bg-surface/90 backdrop-blur-xl">
+    <div class="h-16 px-space-lg flex items-center gap-space-sm max-w-3xl mx-auto">
+      <span class="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-serif text-lg">C</span>
+      <div class="flex flex-col">
+        <span class="font-serif text-[20px] leading-6 text-on-surface tracking-tight">Claridad</span>
+        <span class="font-sans text-[11px] text-on-surface-variant/80">Briefing personal · POC de validación</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-3xl mx-auto px-space-lg pb-space-xl flex flex-col gap-space-lg">
+    <section class="pt-space-md flex flex-col gap-space-sm">
+      <p class="font-sans text-xs uppercase tracking-wider font-semibold text-primary">Pilotaje por invitación · cupos limitados</p>
+      <!-- Copy por variante: servidor y fornecedor deciden variante antes del render. -->
+      <h1 id="headline" class="font-serif text-4xl text-on-surface leading-tight m-0"></h1>
+      <p id="subheadline" class="font-serif text-lg text-on-surface-variant italic max-w-prose m-0"></p>
+    </section>
+
+    <section class="flex flex-col gap-space-sm">
+      <div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-2">
+        <span class="font-sans text-[11px] uppercase tracking-wider font-semibold text-on-surface-variant">Qué haremos</span>
+        <ul class="font-sans text-[14px] text-on-surface list-disc pl-5 m-0 flex flex-col gap-1">
+          <li>Morning briefing breve, con lo que realmente cambió — no un feed infinito.</li>
+          <li>Cada hecho con trazabilidad a su fuente primaria y nivel de confianza.</li>
+          <li>Horario de entrega sereno y sin interrupciones fuera de tus ventanas elegidas.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- CTA + formulario de reserva -->
+    <section id="cta-section" class="flex flex-col gap-space-sm">
+      <button id="cta-btn" type="button"
+        class="w-full h-14 bg-primary text-on-primary rounded-lg font-sans text-base font-semibold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors focus:outline-2 focus:outline-primary">
+        <span class="material-symbols-outlined" style="font-size:20px">mail</span>
+        Reservar mi plaza
+      </button>
+      <p class="font-sans text-xs text-on-surface-variant text-center m-0">
+        Sin permisos de correo ni notificaciones. Solo email y consentimiento explícito.
+      </p>
+    </section>
+
+    <section id="form-section" class="hidden flex-col gap-space-md bg-surface-container-lowest rounded-xl p-space-md shadow-sm">
+      <h2 class="font-serif text-xl text-on-surface m-0">Reserva tu plaza</h2>
+      <form id="reserve-form" class="flex flex-col gap-space-md" novalidate>
+        <div class="flex flex-col gap-1">
+          <label for="email" class="font-sans text-sm text-on-surface font-medium">Correo electrónico</label>
+          <input id="email" name="email" type="email" autocomplete="email" required inputmode="email"
+            placeholder="tucorreo@ejemplo.com"
+            class="bg-surface-container rounded-lg px-3 py-2.5 font-sans text-sm focus:outline-2 focus:outline-primary" />
+          <p id="email-error" class="font-sans text-xs text-error m-0" hidden>Ingresa un correo válido.</p>
+        </div>
+        <div class="flex items-start gap-2">
+          <input id="consent" name="consent" type="checkbox" required
+            class="mt-0.5 w-4 h-4 accent-[#10533f] focus:outline-2 focus:outline-primary" />
+          <label for="consent" class="font-sans text-xs text-on-surface-variant leading-snug">
+            Acepto que Claridad guarde mi correo solo para contactarme sobre el pilotaje
+            (retención: 90 días después del experimento o retirada por petición).
+            Sin marketing ni terceros.
+          </label>
+        </div>
+        <p id="consent-error" class="font-sans text-xs text-error m-0 -mt-2" hidden>Debes dar tu consentimiento explícito.</p>
+        <button id="submit-btn" type="submit" disabled
+          class="w-full h-12 bg-primary text-on-primary rounded-lg font-sans text-sm font-semibold flex items-center justify-center hover:bg-primary-container transition-colors disabled:opacity-50 focus:outline-2 focus:outline-primary">
+          Confirmar reserva
+        </button>
+        <p id="form-error" class="font-sans text-xs text-error text-center m-0" hidden></p>
+        <p class="font-sans text-[11px] text-on-surface-variant/70 text-center m-0">
+          Tratamiento mínimo: email + fecha + variante del experimento, guardados en D1,
+          borrados a los 90 días del fin del experimento. No se comparten con terceros.
+        </p>
+      </form>
+    </section>
+
+    <section id="confirmation-section" class="hidden flex-col gap-space-sm bg-primary-fixed/40 rounded-xl p-space-md items-center text-center">
+      <span class="material-symbols-outlined text-primary" style="font-size:40px">check_circle</span>
+      <h2 class="font-serif text-2xl text-on-surface m-0">Plaza reservada</h2>
+      <p class="font-sans text-sm text-on-surface-variant m-0" id="confirmation-copy">
+        Te escribiremos cuando abra tu cupo.
+      </p>
+    </section>
+
+    <section class="bg-surface-container rounded-xl p-space-md flex flex-col gap-1">
+      <span class="font-sans text-[11px] uppercase tracking-wider font-semibold text-secondary">Nota de transparencia</span>
+      <p class="font-serif text-base text-on-surface m-0">
+        Este es un experimento de demanda, no de producto final: dos promesas distintas se muestran a personas
+        distintas para medir cuál resuena más. Los datos del POC son demo.
+      </p>
+    </section>
+  </main>
+
+  <footer class="pb-safe bg-surface/90 border-t border-outline/20">
+    <div class="max-w-3xl mx-auto px-space-lg py-space-md flex flex-wrap items-center justify-between gap-2">
+      <span class="font-sans text-[11px] text-on-surface-variant/70">Claridad · experimento de demanda · Week-3 del plan de validación</span>
+      <a href="/" class="font-sans text-[11px] text-primary font-semibold no-underline">Ver el producto demo</a>
+    </div>
+  </footer>
+
+  <script>
+    (async function boot() {
+      const qs = (s) => document.querySelector(s);
+      const COPY = {
+        A: {
+          headline: 'Menos interrupciones',
+          sub: 'Recibe menos ruido. Conserva lo que realmente importa.',
+          promise: 'Recupera tu atención y reduce el bombardeo de novedades.',
+        },
+        B: {
+          headline: 'Entender lo importante en menos tiempo',
+          sub: 'Entiende qué cambió, por qué importa y de dónde viene.',
+          promise: 'Reduce el tiempo que necesitas para comprender temas relevantes con fuentes trazables.',
+        },
+      };
+
+      let variant = 'A';
+      try {
+        const res = await fetch('/api/experiment/visit', { method: 'POST' });
+        if (!res.ok) throw new Error('visit -> ' + res.status);
+        const data = await res.json();
+        variant = data.variant || 'A';
+        // Refuerza la cookie desde el cliente también, por si alguna capa intermedia la limpia.
+        document.cookie = 'claridad_variant=' + variant + '; Path=/; Max-Age=15552000; SameSite=Lax';
+        document.cookie = 'claridad_vid=' + data.visitor_id + '; Path=/; Max-Age=15552000; SameSite=Lax';
+      } catch (err) {
+        console.error(err);
+        // Fallback: elegir A localmente si el servidor no está disponible (no persistente).
+      }
+      const copy = COPY[variant] || COPY.A;
+      document.title = 'Claridad — ' + copy.headline;
+      qs('#headline').textContent = copy.headline;
+      qs('#subheadline').textContent = copy.sub + ' ' + copy.promise;
+
+      const funnelEvent = (event) =>
+        fetch('/api/experiment/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event }),
+        }).catch(() => {});
+
+      qs('#cta-btn').addEventListener('click', () => {
+        funnelEvent('cta_clicked');
+        qs('#cta-section').classList.add('hidden');
+        const fs = qs('#form-section');
+        fs.classList.remove('hidden');
+        fs.classList.add('flex');
+        funnelEvent('form_started');
+        qs('#email').focus();
+      });
+
+      const emailInput = qs('#email');
+      const consentBox = qs('#consent');
+      const submitBtn = qs('#submit-btn');
+      const emailErr = qs('#email-error');
+      const consentErr = qs('#consent-error');
+      const formErr = qs('#form-error');
+      const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+      function validate() {
+        const emailOk = EMAIL_RE.test(emailInput.value.trim());
+        const consentOk = consentBox.checked;
+        emailErr.hidden = emailOk || !emailInput.value;
+        consentErr.hidden = consentOk;
+        submitBtn.disabled = !(emailOk && consentOk);
+      }
+      emailInput.addEventListener('input', validate);
+      emailInput.addEventListener('blur', validate);
+      consentBox.addEventListener('change', validate);
+
+      qs('#reserve-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        validate();
+        if (submitBtn.disabled) return;
+        submitBtn.disabled = true;
+        formErr.hidden = true;
+        try {
+          const res = await fetch('/api/experiment/reserve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: emailInput.value.trim(), consent: true }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 201 || (res.status === 200 && data.duplicate)) {
+            qs('#form-section').classList.add('hidden');
+            const cs = qs('#confirmation-section');
+            cs.classList.remove('hidden');
+            cs.classList.add('flex');
+            qs('#confirmation-copy').textContent = data.duplicate
+              ? 'Ya teníamos tu correo registrado — no se ha duplicado nada.'
+              : 'Te escribiremos cuando abra tu cupo. Revisa tu bandeja.';
+          } else if (res.status === 429) {
+            formErr.textContent = 'Demasiadas solicitudes: espera unos minutos e intenta de nuevo.';
+            formErr.hidden = false;
+            submitBtn.disabled = false;
+          } else {
+            formErr.textContent = data.error || 'No se pudo reservar. Intenta de nuevo.';
+            formErr.hidden = false;
+            submitBtn.disabled = false;
+          }
+        } catch (err) {
+          console.error(err);
+          formErr.textContent = 'No se pudo conectar. Verifica tu conexión e intenta de nuevo.';
+          formErr.hidden = false;
+          submitBtn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

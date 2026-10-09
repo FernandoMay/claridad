@@ -1,4 +1,5 @@
--- Datos de demo para la POC (los mismos de los diseños, ahora consultados por API)
+-- Datos de demo para la POC (los mismos de los diseños, consultados por API).
+-- ⚠️ FICTICIOS: no verifican fuentes primarias reales; el UI los etiqueta como demo.
 INSERT OR IGNORE INTO sources (slug, name, category, description, active, rigor) VALUES
   ('reuters', 'Reuters', 'agencia', 'Agencia internacional · 2 novedades hoy', 1, 98),
   ('chequeado', 'Chequeado', 'fact-check', 'Verificación de datos · 1 análisis reciente', 1, 95),
@@ -21,12 +22,13 @@ INSERT OR IGNORE INTO topics (slug, title, summary, status, edition, priority, d
    'Desglose sereno de las funciones de recompensa que priorizan la retención emocional frente a la relevancia temática.',
    'fondo', 'matutina', 40, 0, 2, NULL);
 
--- Datos de la ficha principal: hechos verificados
+-- Datos de la ficha principal: hechos y verificación (texto demo curado a mano,
+-- NO verificados contra primarias reales; la UI los presenta como demo).
 INSERT OR IGNORE INTO topic_facts (topic_id, kind, label, detail, verification, confidence) VALUES
   (1, 'cambio', 'Qué cambió',
    'Se prohíbe la retención de tokens biométricos sin consentimiento activo renovable cada 180 días.', NULL, 'alta'),
   (1, 'evidencia', 'Evidencia disponible',
-   'Resolución BOE-2024-1849 y dictamen vinculante de la Agencia de Protección de Datos.', 'Validado por BOE y AEPD', 'alta'),
+   'Resolución BOE-2024-1849 y dictamen vinculante de la Agencia de Protección de Datos.', 'Validado por BOE y AEPD (referencia demo, no comprobada)', 'alta'),
   (1, 'accion', 'Acción recomendada',
    'Verificar la casilla de firma delegada en la app de identidad digital antes del 31 de octubre.', 'Entra en vigor: 1 de nov', 'alta');
 

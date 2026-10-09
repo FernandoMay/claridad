@@ -140,10 +140,17 @@
         btn.className = 'mt-space-lg w-full h-12 bg-primary text-on-primary rounded-lg font-sans text-sm font-semibold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors';
         btn.textContent = '\u2714 comprendido';
         btn.addEventListener('click', async () => {
-          await fetch('/api/sessions?topic=' + topic.id + '&action=comprendido', { method: 'POST' });
           btn.disabled = true;
-          btn.className = 'mt-space-lg w-full h-12 bg-surface-container-high text-on-surface rounded-lg font-sans text-sm font-semibold flex items-center justify-center';
-          btn.textContent = 'Comprendido \u2014 registrado';
+          try {
+            const res = await fetch('/api/sessions?topic=' + topic.id + '&action=comprendido', { method: 'POST' });
+            if (res.status !== 201) throw new Error('POST /api/sessions -> ' + res.status);
+            btn.className = 'mt-space-lg w-full h-12 bg-surface-container-high text-on-surface rounded-lg font-sans text-sm font-semibold flex items-center justify-center';
+            btn.textContent = 'Comprendido \u2014 registrado';
+          } catch (err) {
+            console.error(err);
+            btn.disabled = false;
+            btn.textContent = 'No se pudo registrar \u2014 reintenta';
+          }
         });
         root.append(btn);
       } catch (err) {

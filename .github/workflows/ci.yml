@@ -1,0 +1,20 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node --run test 2>/dev/null || npm test
+      - name: Smoke (esquema + worker importables)
+        run: node -e "import('./worker.js').then(m => { if (!m.default || typeof m.default.fetch !== 'function') { console.error('worker inválido'); process.exit(1); } console.log('worker ok'); })"

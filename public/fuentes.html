@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Claridad — Fuentes</title>
+  <meta name="description" content="Fuentes de confianza de Claridad: rigor declarado, pausa persistente y trazabilidad." />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -56,6 +57,10 @@
       Cada fuente declara su rigor y se audita en cada briefing. Pausar una fuente no borra su historial: solo detiene su ingesta.
     </p>
     <section id="sources-list" class="flex flex-col gap-space-sm"></section>
+
+    <p id="saved-banner" class="font-sans text-xs text-error text-center m-0" hidden>
+      No se pudo guardar el cambio. Revisa tu conexión e intenta de nuevo.
+    </p>
 
     <section class="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-1 mt-2">
       <span class="font-sans text-[11px] uppercase tracking-wider font-semibold text-secondary">Principio de trazabilidad</span>
@@ -123,14 +128,30 @@
           const knob = document.createElement('span');
           knob.className = 'w-6 h-6 bg-surface-container-lowest rounded-full shadow-sm';
           btn.append(knob);
-          btn.addEventListener('click', () => {
+          btn.addEventListener('click', async () => {
             const now = btn.getAttribute('aria-pressed') !== 'true';
-            btn.setAttribute('aria-pressed', String(now));
-            btn.classList.toggle('bg-primary', now);
-            btn.classList.toggle('justify-end', now);
-            btn.classList.toggle('bg-surface-container-highest', !now);
-            btn.classList.toggle('justify-start', !now);
-            updateCount();
+            btn.disabled = true;
+            try {
+              const res = await fetch('/api/sources/' + s.slug, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: now }),
+              });
+              if (res.status !== 200) throw new Error('PATCH /api/sources/' + s.slug + ' -> ' + res.status);
+              // Persistido en D1: recargar la página mantiene el estado.
+              btn.setAttribute('aria-pressed', String(now));
+              btn.classList.toggle('bg-primary', now);
+              btn.classList.toggle('justify-end', now);
+              btn.classList.toggle('bg-surface-container-highest', !now);
+              btn.classList.toggle('justify-start', !now);
+              updateCount();
+            } catch (err) {
+              console.error(err);
+              const banner = qs('#saved-banner');
+              if (banner) { banner.hidden = false; setTimeout(() => (banner.hidden = true), 2500); }
+            } finally {
+              btn.disabled = false;
+            }
           });
           card.append(left, btn);
           host.append(card);
