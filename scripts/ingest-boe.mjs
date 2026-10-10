@@ -10,10 +10,10 @@
  *   node scripts/ingest-boe.mjs
  *
  * Configurable vía variables de entorno:
- *   CLARIDAD_API_URL   — URL base del Worker (default: https://claridad.fmay130.workers.dev)
- *   CLARIDAD_API_TOKEN — token opcional para endpoints administrados (no requerido para ingest)
- *   ONLY_TOPICS        — filtro de tema: solo ingestar si el título contiene esta cadena (opcional)
- *   MAX_ITEMS          — máx de items a inyectar por ejecución (default: 20)
+ *   CLARIDAD_API_URL        — URL base del Worker (default: https://claridad.fmay130.workers.dev)
+ *   CLARIDAD_PIPELINE_TOKEN — token del pipeline (X-Pipeline-Token) para /api/content/* (requerido si el Worker tiene PIPELINE_TOKEN configurado)
+ *   ONLY_TOPICS             — filtro de tema: solo ingestar si el título contiene esta cadena (opcional)
+ *   MAX_ITEMS               — máx de items a inyectar por ejecución (default: 20)
  *
  * Diseño:
  *  - Fuente BOE → source_slug 'boe', category 'primaria', rigor 100.
@@ -24,8 +24,8 @@
  *  - Tolerancia a errores: si el feed falla o el Worker devuelve 429/5xx, el script
  *    registra y sale con código 0 salvo error interno del propio scraper.
  *
- * Limitación declarada: BOE publica el sumario del día; el scraper toma el primer
- * item del feed como tema del día. No es un backfile completo.
+ * Limitación declarada: BOE publica el sumario del día; el scraper procesa los
+ * items que el feed trae en esta ejecución, hasta MAX_ITEMS. No es un backfile completo.
  */
 
 const BOE_FEED_URL = 'https://www.boe.es/rss/boe.php?s=1';

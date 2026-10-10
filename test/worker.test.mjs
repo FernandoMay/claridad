@@ -295,6 +295,18 @@ const run = async () => {
     assert.equal(r3.status, 409);
   });
 
+  await test("content: la tarjeta del proceso reporta el conteo real de fuentes (no 0)", async () => {
+    // Ingesta y proceso completo (el tema feed-2 se procesó en el test anterior).
+    const r = await worker.fetch(req("/api/topics"), env, null);
+    const { data } = await resJson(r);
+    const card = data.topics.find(t => t.slug && t.title === "Desmentido sobre algo");
+    assert.ok(card, "el tema procesado debe existir en el listado");
+    assert.ok(card.sources_count >= 1, `sources_count debe reflejar topic_sources (${card.sources_count})`);
+    // Coherencia con la tabla relacional.
+    const rel = await env.DB.prepare(`SELECT COUNT(*) AS n FROM topic_sources WHERE topic_id = ?1`).bind(card.id).first();
+    assert.equal(card.sources_count, rel.n);
+  });
+
   await test("content: duplicado por external_id se rechaza sin crear segundo item", async () => {
     const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "feed-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "Otro título" }] }) }), env, null);
     const { data } = await resJson(r);

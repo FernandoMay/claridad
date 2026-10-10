@@ -138,10 +138,17 @@ export default {
         }
 
         case pathname === "/api/topics": {
+          // El conteo real de fuentes vive en topic_sources (tabla relacional);
+          // sources_count de la columna se recalcula aquí para que la tarjeta
+          // nunca muestre 0 cuando la trazabilidad existe.
           const topics = await env.DB.prepare(
-            `SELECT id, slug, title, summary, status, edition, priority,
-                    dedup_count, sources_count, deadline
-               FROM topics ORDER BY priority DESC`
+            `SELECT t.id, t.slug, t.title, t.summary, t.status, t.edition, t.priority,
+                    t.dedup_count, t.deadline,
+                    COUNT(ts.source_id) AS sources_count
+               FROM topics t
+               LEFT JOIN topic_sources ts ON ts.topic_id = t.id
+              GROUP BY t.id
+              ORDER BY t.priority DESC`
           ).all();
           return json({ topics: topics.results }, 200, null, request);
         }
@@ -673,8 +680,12 @@ async function processIngestItem(env, item) {
 
   // Asegurar la relación topic_sources (la fuente ya existe por ingestItem).
   const src = await env.DB.prepare(`SELECT id FROM sources WHERE slug = ?1`).bind(item.source_slug).first();
-  await env.DB.prepare(`INSERT OR IGNORE INTO topic_sources (topic_id, source_id, reference, note) VALUES (?1, ?2, ?3, ?4)`)
+  const insertTs = await env.DB.prepare(`INSERT OR IGNORE INTO topic_sources (topic_id, source_id, reference, note) VALUES (?1, ?2, ?3, ?4)`)
     .bind(topicId, src.id, `ingest-${item.external_id}`, item.source_name).run();
+  if (insertTs.meta.changes > 0) {
+    // Mantener la columna desnormalizada coherente con la tabla relacional.
+    await env.DB.prepare(`UPDATE topics SET sources_count = sources_count + 1 WHERE id = ?1`).bind(topicId).run();
+  }
 
   // Si el item trae un summary, registrar como hecho de tipo 'hecho'.
   if (item.summary && item.summary !== item.title) {
