@@ -59,8 +59,11 @@ function test(name, fn) {
   );
 }
 
-const req = (path, init = {}) =>
-  new Request(`http://localhost:8787${path}`, { ...init, headers: { ...init.headers } });
+const req = (path, init = {}) => {
+  const headers = init.headers || {};
+  const r = new Request(`http://localhost:8787${path}`, { ...init, headers });
+  return r;
+};
 
 const resJson = async (res) => ({ status: res.status, data: await res.json().catch(() => null), res });
 
@@ -196,14 +199,207 @@ const run = async () => {
     assert.ok(v.n >= 1);
   });
 
-  await test("métricas: sin PII en la respuesta", async () => {
-    const r = await worker.fetch(req("/api/experiment/metrics", { headers: { Origin: "http://localhost:8787" } }), env, null);
+  // P0: métricas ahora requieren token. Para testear la respuesta exitosa y
+  // verificar que no expone PII, se configura un token de admin en el env.
+  await test("métricas: sin PII en la respuesta (solo con token de admin)", async () => {
+    const envAdmin = { ...env, EXPERIMENT_ADMIN_TOKEN: "test-metrics-token" };
+    const r = await worker.fetch(req("/api/experiment/metrics", { headers: { Origin: "http://localhost:8787", "X-Experiment-Admin": "test-metrics-token" } }), envAdmin, null);
     const { status, data } = await resJson(r);
     assert.equal(status, 200);
     const text = JSON.stringify(data);
     assert.ok(!text.includes("a@b.co"), "no debe exponer emails");
     assert.ok(Array.isArray(data.metrics));
     assert.ok(data.primary && data.primary.note.includes("inconcluso"));
+  });
+
+  // P0: A/B — forzar variante rechazado + evento variant_assignment_error.
+  await test("P0 visit: rechaza forzar variante por query ?variant= y registra variant_assignment_error", async () => {
+    let r = await worker.fetch(req("/api/experiment/visit?variant=B", { method: "POST", headers: { Origin: "http://localhost:8787" } }), env, null);
+    const { status, data } = await resJson(r);
+    assert.equal(status, 403);
+    assert.equal(data.error, "no se acepta forzar la variante");
+    // Confirmar que se registró el evento de auditoría (sin PII de visitante real).
+    const errors = await env.DB.prepare(`SELECT COUNT(*) AS n FROM experiment_events WHERE event='variant_assignment_error'`).first();
+    assert.equal(errors.n, 1);
+    const errMeta = await env.DB.prepare(`SELECT metadata, variant FROM experiment_events WHERE event='variant_assignment_error'`).first();
+    const meta = JSON.parse(errMeta.metadata);
+    assert.equal(meta.reason, "forced_variant_rejected");
+    assert.equal(errMeta.variant, "B");
+    // Confirmar que un visitante existente KEEPA su variante: cookies presentes → 200, misma variante.
+    // (Usamos un visitante recién creado para no depender del estado dejado por
+    //  otras pruebas; la invariante es que la cookie de variante persiste.)
+    let fresh = await worker.fetch(req("/api/experiment/visit", { method: "POST", headers: { Origin: "http://localhost:8787" } }), env, null);
+    const { data: freshData } = await resJson(fresh);
+    const setCookies = fresh.headers.getSetCookie();
+    const variantCookie = setCookies.find(c => c.startsWith("claridad_variant=")).split(";")[0];
+    const vidCookie = setCookies.find(c => c.startsWith("claridad_vid=")).split(";")[0];
+    const r2 = await worker.fetch(req("/api/experiment/visit", { method: "POST", headers: { Origin: "http://localhost:8787", Cookie: `${vidCookie}; ${variantCookie}` } }), env, null);
+    const { status: s2, data: d2 } = await resJson(r2);
+    assert.equal(s2, 200);
+    assert.equal(d2.variant, freshData.variant);
+  });
+
+  // v1.0 pipeline de contenido real — ingesta + deducción + procesado.
+  await test("content: ingesta rechaza cuerpo inválido y acepta items válidos", async () => {
+    // Cuerpo inválido.
+    let r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({}) }), env, null);
+    assert.equal(r.status, 400);
+    r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: "no-array" }) }), env, null);
+    assert.equal(r.status, 400);
+    // Item sin fields requeridos.
+    r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "x" }] }) }), env, null);
+    assert.equal(r.status, 201);
+    const { data } = await resJson(r);
+    assert.equal(data.summary.error, 1);
+    // Item válido: se ingesta y se puede listar como pendiente.
+    r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "feed-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "Corta de prensa demo", summary: "Un breve sobre algo relevante", link: "https://ejemplo.com/1" }] }) }), env, null);
+    assert.equal(r.status, 201);
+    const { data: d2 } = await resJson(r);
+    assert.equal(d2.summary.ok, 1);
+    assert.ok(d2.ingested[0].status === "ok");
+    // Listar pendientes.
+    r = await worker.fetch(req("/api/content/pending", { headers: { Origin: "http://localhost:8787" } }), env, null);
+    const { status: s3, data: d3 } = await resJson(r);
+    assert.equal(s3, 200);
+    assert.ok(Array.isArray(d3.pending));
+    assert.ok(d3.pending.some(p => p.external_id === "feed-1"));
+  });
+
+  await test("content: procesar item pendiente crea tema + facts + sources y marca como procesado", async () => {
+    // Ingestar un item.
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "feed-2", source_slug: "afp-factual", source_name: "AFP Factual", source_category: "fact-check", title: "Desmentido sobre algo", summary: "Un desmentido claro sobre una afirmación", link: "https://ejemplo.com/2" }] }) }), env, null);
+    const { data: d1 } = await resJson(r);
+    assert.equal(d1.summary.ok, 1);
+    const ingestId = d1.ingested[0].id;
+    // Procesar.
+    const r2 = await worker.fetch(req("/api/content/process/" + ingestId, { method: "POST", headers: { Origin: "http://localhost:8787" } }), env, null);
+    const { status: s2, data: d2 } = await resJson(r2);
+    assert.equal(s2, 200);
+    assert.ok(d2.processed.topic_id);
+    assert.ok(d2.processed.topic_slug);
+    const pid = d2.processed.topic_id;
+    // Verificar que el tema existe en la BD.
+    const topic = await env.DB.prepare(`SELECT * FROM topics WHERE id = ?1`).bind(pid).first();
+    assert.equal(topic.title, "Desmentido sobre algo");
+    // Verificar que hay un topic_source asociado.
+    const ts = await env.DB.prepare(`SELECT COUNT(*) AS n FROM topic_sources WHERE topic_id = ?1`).bind(pid).first();
+    assert.ok(ts.n >= 1);
+    // Verificar que hay un topic_fact (el summary se convirtió en hecho).
+    const tf = await env.DB.prepare(`SELECT COUNT(*) AS n FROM topic_facts WHERE topic_id = ?1`).bind(pid).first();
+    assert.ok(tf.n >= 1);
+    // Verificar que el item está marcado como procesado.
+    const ingest = await env.DB.prepare(`SELECT status FROM content_ingest WHERE id = ?1`).bind(ingestId).first();
+    assert.equal(ingest.status, "procesado");
+    // Re-procesar → 409 (ya procesado).
+    const r3 = await worker.fetch(req("/api/content/process/" + ingestId, { method: "POST", headers: { Origin: "http://localhost:8787" } }), env, null);
+    assert.equal(r3.status, 409);
+  });
+
+  await test("content: duplicado por external_id se rechaza sin crear segundo item", async () => {
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "feed-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "Otro título" }] }) }), env, null);
+    const { data } = await resJson(r);
+    assert.equal(r.status, 201);
+    assert.equal(data.summary.duplicate, 1);
+    assert.equal(data.summary.ok, 0);
+    // Un solo item con ese external_id en la BD.
+    const n = await env.DB.prepare(`SELECT COUNT(*) AS n FROM content_ingest WHERE external_id = 'feed-1'`).first();
+    assert.equal(n.n, 1);
+  });
+
+  await test("content: la fuente se crea automáticamente si no existe", async () => {
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "feed-3", source_slug: "nueva-fuente", source_name: "Nueva Fuente", source_category: "contextual", title: "Algo de la nueva fuente" }] }) }), env, null);
+    const { data } = await resJson(r);
+    assert.equal(data.summary.ok, 1);
+    // La fuente ahora existe.
+    const src = await env.DB.prepare(`SELECT * FROM sources WHERE slug = 'nueva-fuente'`).first();
+    assert.ok(src);
+    assert.equal(src.name, "Nueva Fuente");
+    assert.equal(src.category, "contextual");
+  });
+
+  // Pipeline de contenido: autenticación server-to-server con PIPELINE_TOKEN.
+  // Los tests explícitos cubren ambos fallos posibles: token ausente/incorrecto
+  // (inyección no autorizada) y autorización correcta incluso sin Origin.
+  await test("content: PIPELINE_TOKEN rechaza ingest sin token aunque no haya Origin", async () => {
+    const envPipe = { ...env, PIPELINE_TOKEN: "test-pipeline-token" };
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "pipe-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "X" }] }) }), envPipe, null);
+    assert.equal(r.status, 403);
+    const { data } = await resJson(r);
+    assert.equal(data.error, "no autorizado");
+  });
+
+  await test("content: PIPELINE_TOKEN rechaza ingest con token incorrecto aunque no haya Origin", async () => {
+    const envPipe = { ...env, PIPELINE_TOKEN: "test-pipeline-token" };
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { "Content-Type": "application/json", "X-Pipeline-Token": "wrong" }, body: JSON.stringify({ items: [{ external_id: "pipe-2", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "X" }] }) }), envPipe, null);
+    assert.equal(r.status, 403);
+    const { data } = await resJson(r);
+    assert.equal(data.error, "no autorizado");
+  });
+
+  await test("content: PIPELINE_TOKEN autoriza ingest y pending con token correcto aunque no haya Origin", async () => {
+    const envPipe = { ...env, PIPELINE_TOKEN: "test-pipeline-token" };
+    // Ingesta con token correcto y sin Origin.
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { "Content-Type": "application/json", "X-Pipeline-Token": "test-pipeline-token" }, body: JSON.stringify({ items: [{ external_id: "pipe-3", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "T", summary: "S" }] }) }), envPipe, null);
+    assert.equal(r.status, 201);
+    const { data: d1 } = await resJson(r);
+    assert.equal(d1.summary.ok, 1);
+    const ingestId = d1.ingested[0].id;
+    // Pending con token correcto y sin Origin.
+    const r2 = await worker.fetch(req("/api/content/pending", { headers: { "X-Pipeline-Token": "test-pipeline-token" } }), envPipe, null);
+    assert.equal(r2.status, 200);
+    const { data: d2 } = await resJson(r2);
+    assert.ok(d2.pending.some(p => p.id === ingestId));
+    // Process con token correcto y sin Origin.
+    const r3 = await worker.fetch(req("/api/content/process/" + ingestId, { method: "POST", headers: { "X-Pipeline-Token": "test-pipeline-token" } }), envPipe, null);
+    assert.equal(r3.status, 200);
+  });
+
+  await test("content: PIPELINE_TOKEN protege ingest/process/pending cuando está configurado", async () => {
+    const envPipe = { ...env, PIPELINE_TOKEN: "test-pipeline-token" };
+    // Sin token → 403 (sin Origin válido para forzar la comprobación de token).
+    let r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "tok-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "T" }] }) }), envPipe, null);
+    assert.equal(r.status, 403);
+    const { data } = await resJson(r);
+    assert.equal(data.error, "no autorizado");
+    // Con token → 201.
+    r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json", "X-Pipeline-Token": "test-pipeline-token" }, body: JSON.stringify({ items: [{ external_id: "tok-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "T" }] }) }), envPipe, null);
+    assert.equal(r.status, 201);
+    const { data: d1 } = await resJson(r);
+    assert.equal(d1.summary.ok, 1);
+    // process sin token → 403.
+    const ingestId = d1.ingested[0].id;
+    r = await worker.fetch(req("/api/content/process/" + ingestId, { method: "POST", headers: { Origin: "http://localhost:8787" } }), envPipe, null);
+    assert.equal(r.status, 403);
+    // process con token → 200.
+    r = await worker.fetch(req("/api/content/process/" + ingestId, { method: "POST", headers: { Origin: "http://localhost:8787", "X-Pipeline-Token": "test-pipeline-token" } }), envPipe, null);
+    assert.equal(r.status, 200);
+    // pending sin token → 403.
+    r = await worker.fetch(req("/api/content/pending"), envPipe, null);
+    assert.equal(r.status, 403);
+    // pending con token → 200.
+    r = await worker.fetch(req("/api/content/pending", { headers: { "X-Pipeline-Token": "test-pipeline-token" } }), envPipe, null);
+    assert.equal(r.status, 200);
+  });
+
+  // P0: métricas protegidas — sin token → 403 incluso si no hay token configurado en env.
+  await test("P0 metrics: sin X-Experiment-Admin → 403 (fail closed)", async () => {
+    // Arrange: configurar token de admin en env (describe el comportamiento cuando está configurado).
+    const envAdmin = { ...env, EXPERIMENT_ADMIN_TOKEN: "test-admin-token" };
+    let r = await worker.fetch(req("/api/experiment/metrics", { headers: { Origin: "http://localhost:8787" } }), envAdmin, null);
+    assert.equal(r.status, 403);
+    const { data } = await resJson(r);
+    assert.equal(data.error, "token requerido");
+    // Con token correcto → 200.
+    r = await worker.fetch(req("/api/experiment/metrics", { headers: { Origin: "http://localhost:8787", "X-Experiment-Admin": "test-admin-token" } }), envAdmin, null);
+    const { status, data: d2 } = await resJson(r);
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(d2.metrics));
+    // Token incorrecto → 403.
+    r = await worker.fetch(req("/api/experiment/metrics", { headers: { Origin: "http://localhost:8787", "X-Experiment-Admin": "wrong" } }), envAdmin, null);
+    assert.equal(r.status, 403);
+    // Token vacío → 403.
+    r = await worker.fetch(req("/api/experiment/metrics", { headers: { Origin: "http://localhost:8787", "X-Experiment-Admin": "" } }), envAdmin, null);
+    assert.equal(r.status, 403);
   });
 
   console.log(`\n${passed} pruebas pasaron.`);

@@ -244,7 +244,8 @@ export default {
         // POST /api/experiment/visit
         // Asigna variante de forma reproducible y persiste el evento de visita
         // server-side. La cookie ancla al visitante a una variante durante el
-        // experimento. Cuerpo/params opcionales: variant (para forzar en pruebas).
+        // experimento. NO se acepta forzar variante desde el cliente: la ruta
+        // rechaza ?variant= explícitamente y registra variant_assignment_error.
         case pathname === "/api/experiment/visit" && request.method === "POST": {
           return await handleVisit(request, env, searchParams);
         }
@@ -311,11 +312,17 @@ export default {
         }
 
         // GET /api/experiment/metrics — embudo por variante (agregado, sin PII).
+        // P0: solo accesible cuando hay token de administrador configurado, y
+        // siempre lo exige. Si EXPERIMENT_ADMIN_TOKEN está configurado y falta
+        // o no coincide → 403 sin exponer detalles.
         case pathname === "/api/experiment/metrics" && request.method === "GET": {
           if (!corsHeaders(request)) return errorResponse(request, 403, "origen no permitido");
-          if (env.EXPERIMENT_ADMIN_TOKEN) {
-            const admin = request.headers.get("X-Experiment-Admin");
-            if (admin !== env.EXPERIMENT_ADMIN_TOKEN) return errorResponse(request, 403, "token requerido");
+          const admin = request.headers.get("X-Experiment-Admin");
+          if (!env.EXPERIMENT_ADMIN_TOKEN) {
+            return errorResponse(request, 403, "métricas no disponibles");
+          }
+          if (admin !== env.EXPERIMENT_ADMIN_TOKEN) {
+            return errorResponse(request, 403, "token requerido");
           }
           const m = await env.DB.prepare(
             `WITH visits AS (
@@ -350,9 +357,78 @@ export default {
           return json({ metrics: rows, primary: funnelMeta }, 200, null, request);
         }
 
+        // ---------- Pipeline de contenido real (v1.0) ----------
+        // POST /api/content/ingest — recibe contenido estructurado desde fuera del
+        // Worker (CI/curator/scraper) y lo persiste para procesamiento controlado:
+        // deducción por título+fuente, enriquecimiento básico, asociación a fuentes.
+        // Protegido por PIPELINE_TOKEN (server-to-server, sin datos personales).
+        // El token se exige siempre que esté configurado, independientemente del Origin.
+        // Cuerpo: { items: [ { external_id, source_slug, source_name,
+        //   source_category, source_rigor?, title, summary?, link?, published_at?,
+        //   raw? } ... ] }
+        case pathname === "/api/content/ingest" && request.method === "POST": {
+          if (env.PIPELINE_TOKEN && request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
+            return errorResponse(request, 403, "no autorizado");
+          }
+          const hasCors = !!corsHeaders(request);
+          const hasToken = !!request.headers.get("X-Pipeline-Token");
+          if (!hasCors && !hasToken) {
+            return errorResponse(request, 403, "origen no permitido");
+          }
+          let body;
+          try { body = await request.json(); } catch { return errorResponse(request, 400, "cuerpo JSON inválido"); }
+          if (!body || typeof body !== "object" || !Array.isArray(body.items)) {
+            return errorResponse(request, 400, "se requiere { items: [...] }");
+          }
+          if (body.items.length > 200) return errorResponse(request, 400, "demasiados items (máx 200)");
+          const results = [];
+          for (const item of body.items) {
+            const r = await ingestItem(env, item);
+            results.push(r);
+          }
+          const ok = results.filter(r => r.status === "ok").length;
+          const dup = results.filter(r => r.status === "duplicate").length;
+          const err = results.filter(r => r.status === "error").length;
+          return json({ ingested: results, summary: { ok, duplicate: dup, error: err } }, 201, null, request);
+        }
+
+        // GET /api/content/pending — items pendientes de procesado (para revisión).
+        // Igual que ingest: protegido por PIPELINE_TOKEN cuando está configurado.
+        case pathname === "/api/content/pending" && request.method === "GET": {
+          if (env.PIPELINE_TOKEN && request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
+            return errorResponse(request, 403, "no autorizado");
+          }
+          if (!corsHeaders(request) && !request.headers.get("X-Pipeline-Token")) {
+            return errorResponse(request, 403, "origen no permitido");
+          }
+          const pending = await env.DB.prepare(
+            `SELECT id, external_id, source_slug, source_name, title, summary, link, published_at, status, note, created_at
+               FROM content_ingest WHERE status = 'pendiente' ORDER BY created_at LIMIT 100`
+          ).all();
+          return json({ pending: pending.results }, 200, null, request);
+        }
+
+        // POST /api/content/process/:id — procesa un item pendiente: deduplica,
+        // crea/updates topic+facts+sources, marca como procesado.
+        // Protegido por PIPELINE_TOKEN cuando está configurado.
+        case /^\/api\/content\/process\/[\w-]+$/.test(pathname) && request.method === "POST": {
+          if (env.PIPELINE_TOKEN && request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
+            return errorResponse(request, 403, "no autorizado");
+          }
+          if (!corsHeaders(request) && !request.headers.get("X-Pipeline-Token")) {
+            return errorResponse(request, 403, "origen no permitido");
+          }
+          const id = decodeURIComponent(pathname.split("/").pop());
+          const row = await env.DB.prepare(`SELECT * FROM content_ingest WHERE id = ?1`).bind(id).first();
+          if (!row) return errorResponse(request, 404, "item no encontrado");
+          if (row.status !== "pendiente") return errorResponse(request, 409, "item ya procesado o descartado");
+          const processed = await processIngestItem(env, row);
+          return json({ processed }, 200, null, request);
+        }
+
         default:
           return errorResponse(request, 404, "ruta no encontrada");
-      }
+    }
     } catch (err) {
       return errorResponse(request, 500, "error interno", err);
     }
@@ -365,6 +441,14 @@ async function logEvent(env, vid, variant, event, extra = {}) {
     `INSERT INTO experiment_events (visitor_id, variant, event, metadata)
      VALUES (?1, ?2, ?3, ?4)`
   ).bind(vid, variant, event, extra && Object.keys(extra).length ? JSON.stringify(extra) : null).run();
+}
+
+/** Registra un intento de asignación de variante no permitido (auditoría P0).
+ * `variant` debe ser 'A' o 'B' (la variante que se intentó forzar o la del
+ * visitante, según corresponda) para cumplir el CHECK de experiment_events.
+ */
+async function logVariantAssignmentError(env, vid, variant, reason, extra = {}) {
+  await logEvent(env, vid || "v_unknown", variant, "variant_assignment_error", { reason, ...extra });
 }
 
 /** Respuesta JSON con Set-Cookie (una por cookie) + CORS correcto. */
@@ -397,17 +481,23 @@ function toSetCookie(c) {
   return `${c.name}=${c.value}${c.attrs}`;
 }
 
-/** Garantiza visitor_id + variante, reutilizando cookies si son válidas. */
+/** Garantiza visitor_id + variante, reutilizando cookies si son válidas.
+ * NOTA: las rutas que llaman a esta función son responsables de aplicar la
+ * política de forzado de variante. Por defecto, ?variant= se IGNORA aquí (no
+ * se usa para cambiar la variante), para que cada endpoint pueda decidir su
+ * política sin contaminar el experimento.
+ */
 async function ensureAssignment(request, env, searchParams) {
   const forced = searchParams?.get("variant");
-  const forcedOk = forced && VARIANT_RE.test(forced);
+  // Se recoge para auditoría, pero NO se aplica como variante aquí.
+  const forcedPresent = forced && VARIANT_RE.test(forced);
   let vid = getCookie(request, VISITOR_COOKIE);
   let variant = getCookie(request, VARIANT_COOKIE);
   let stale = false;
   if (vid && !/^v_[\w-]{8,64}$/.test(vid)) { vid = null; stale = true; }
   if (variant && !VARIANT_RE.test(variant)) { variant = null; stale = true; }
-  if (forcedOk) variant = forced;
-  if (vid && variant) return { vid, variant, stale };
+  // IMPORTANTE: no aplicar forced aquí; cada endpoint aplica su política.
+  if (vid && variant) return { vid, variant, stale, forcedPresent };
 
   if (!vid) vid = `v_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
   if (!variant) {
@@ -417,14 +507,32 @@ async function ensureAssignment(request, env, searchParams) {
     variant = byte < 128 ? "A" : "B";
   }
   // Persistir la asignación server-side para el funnel + auditoría.
-  await logEvent(env, vid, variant, "variant_assigned", { forced: forcedOk });
-  return { vid, variant, stale };
+  await logEvent(env, vid, variant, "variant_assigned", { forced: false });
+  return { vid, variant, stale, forcedPresent };
 }
 
-/** POST /api/experiment/visit: registra visita y devuelve variante + cookies. */
+/** POST /api/experiment/visit: registra visita y devuelve variante + cookies.
+ * Política P0: es idempotente y rechaza cualquier intento de forzar la variante
+ * por parte del cliente (query ?variant=, cabeceras inventadas, etc.). Cuando se
+ * detecta un intento, se registra variant_assignment_error y se devuelve 403.
+ */
 async function handleVisit(request, env, searchParams) {
   if (!corsHeaders(request)) return errorResponse(request, 403, "origen no permitido");
-  const { vid, variant, stale } = await ensureAssignment(request, env, searchParams);
+
+  // P0: rechazar forzado de variante desde el cliente.
+  const forcedParam = searchParams?.get("variant");
+  if (forcedParam && VARIANT_RE.test(forcedParam)) {
+    const ip = request.headers.get("CF-Connecting-IP") || "local";
+    // Usamos la variante forzada como variante registrada (es 'A' o 'B') y
+    // el visitante existente si lo tiene, o un id de sonda anónimo.
+    const vid = getCookie(request, VISITOR_COOKIE) || `v_${ip}_forced_probe`;
+    await logVariantAssignmentError(env, vid, forcedParam, "forced_variant_rejected", {
+      ua: (request.headers.get("User-Agent") || "").slice(0, 120),
+    });
+    return errorResponse(request, 403, "no se acepta forzar la variante");
+  }
+
+  const { vid, variant, stale } = await ensureAssignment(request, env, null);
   const ip = request.headers.get("CF-Connecting-IP") || "local";
   if (await rateLimited(env, `visit-ip:${ip}`, 60, 60)) {
     return errorResponse(request, 429, "demasiadas visitas; intenta más tarde");
@@ -459,6 +567,127 @@ async function rateLimited(env, key, max, windowSec) {
   }
   const current = (row ? row.count : 0) + 1;
   return current > max;
+}
+
+/** Genera un slug ASCII a partir de un título: lowercase, sin acentos,
+ * sin caracteres no alfanuméricos salvo guiones, truncado a 80 caracteres.
+ * Las colisiones se resuelven con un sufijo numérico cuando sea necesario.
+ */
+function slugify(title, existing) {
+  const base = title
+    .normalize("NFD").replace(/\p{Mn}/gu, "")           // quitar acentos
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")                       // dejar solo letras, dígitos, espacios, guiones
+    .replace(/\s+/g, "-").replace(/-+/g, "-").trim()    // espacios → guiones, colapsar
+    .slice(0, 80);
+  if (!base) return " tema-" + Date.now().toString(36);
+  const set = new Set(existing || []);
+  let candidate = base;
+  let i = 1;
+  while (set.has(candidate)) {
+    candidate = base.slice(0, 75 - String(i).length) + "-" + i;
+    i++;
+  }
+  return candidate;
+}
+
+/** Persiste un item de ingesta (o lo marca como duplicado si ya existe). */
+async function ingestItem(env, item) {
+  if (!item || typeof item !== "object") return { status: "error", reason: "item inválido" };
+  const external_id = typeof item.external_id === "string" ? item.external_id.trim() : "";
+  if (!external_id) return { status: "error", reason: "external_id requerido" };
+  const source_slug = typeof item.source_slug === "string" ? item.source_slug.trim() : "";
+  if (!source_slug) return { status: "error", reason: "source_slug requerido" };
+  const source_name = typeof item.source_name === "string" ? item.source_name.trim() : "";
+  if (!source_name) return { status: "error", reason: "source_name requerido" };
+  const source_category = typeof item.source_category === "string" ? item.source_category.trim() : "";
+  if (!source_category || !new Set(["agencia", "fact-check", "primaria", "contextual"]).has(source_category)) {
+    return { status: "error", reason: "source_category inválida" };
+  }
+  const title = typeof item.title === "string" ? item.title.trim() : "";
+  if (!title) return { status: "error", reason: "title requerido" };
+  const source_rigor = typeof item.source_rigor === "number" ? Math.max(0, Math.min(100, item.source_rigor)) : 90;
+
+  // Asegurar que la fuente existe (la crea con rigor declarado si no está).
+  const src = await env.DB.prepare(`SELECT id, slug, active, rigor FROM sources WHERE slug = ?1`).bind(source_slug).first();
+  if (!src) {
+    try {
+      await env.DB.prepare(`INSERT INTO sources (slug, name, category, description, active, rigor) VALUES (?1, ?2, ?3, ?4, 1, ?5)`)
+        .bind(source_slug, source_name, source_category, `Fuente añadida por pipeline de contenido ${new Date().toISOString().slice(0, 10)}`, source_rigor).run();
+    } catch (e) {
+      // Colisión de slug concurrente: re-leer.
+      const src2 = await env.DB.prepare(`SELECT id, slug, active, rigor FROM sources WHERE slug = ?1`).bind(source_slug).first();
+      if (!src2) return { status: "error", reason: "no se pudo crear la fuente" };
+    }
+  }
+
+  // Duplicado: mism external_id already ingested.
+  const existing = await env.DB.prepare(`SELECT id, status FROM content_ingest WHERE external_id = ?1`).bind(external_id).first();
+  if (existing) {
+    return { status: "duplicate", existing_id: existing.id, existing_status: existing.status };
+  }
+
+  const r = await env.DB.prepare(`INSERT INTO content_ingest (external_id, source_slug, source_name, source_category, source_rigor, title, summary, link, published_at, raw)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`)
+    .bind(external_id, source_slug, source_name, source_category, source_rigor, title, item.summary || null, item.link || null, item.published_at || null, item.raw || null).run();
+  return { status: "ok", id: r.meta.last_row_id };
+}
+
+/** Procesa un item pendiente de content_ingest: deduplica contra temas existentes
+ * por título+fuente, crea o actualiza el tema, añade facts y sources, y marca
+ * el item como procesado. Es el núcleo del pipeline de contenido real.
+ */
+async function processIngestItem(env, item) {
+  // Deduplicación: buscar tema existente con título similar + misma fuente.
+  const existing = await env.DB.prepare(
+    `SELECT t.id, t.slug, t.title
+       FROM topics t
+       JOIN topic_sources ts ON ts.topic_id = t.id
+       JOIN sources s ON s.id = ts.source_id
+      WHERE s.slug = ?1 AND t.title = ?2`
+  ).bind(item.source_slug, item.title).first();
+
+  let topicId, topicSlug;
+  if (existing) {
+    topicId = existing.id;
+    topicSlug = existing.slug;
+  } else {
+    // Generar slug único.
+    const existingSlugs = await env.DB.prepare(`SELECT slug FROM topics`).all();
+    const slug = slugify(item.title, existingSlugs.results.map(r => r.slug));
+    const summary = item.summary || item.title;
+    const now = new Date().toISOString().slice(0, 10);
+    const tr = await env.DB.prepare(
+      `INSERT INTO topics (slug, title, summary, status, edition, priority, deadline, created_at) VALUES (?1, ?2, ?3, 'nuevo', 'matutina', 50, ?4, ?5)`
+    ).bind(slug, item.title, summary, item.published_at ? item.published_at.slice(0, 10) : null, now).run();
+    topicId = tr.meta.last_row_id;
+    topicSlug = slug;
+  }
+
+  // Asegurar la relación topic_sources (la fuente ya existe por ingestItem).
+  const src = await env.DB.prepare(`SELECT id FROM sources WHERE slug = ?1`).bind(item.source_slug).first();
+  await env.DB.prepare(`INSERT OR IGNORE INTO topic_sources (topic_id, source_id, reference, note) VALUES (?1, ?2, ?3, ?4)`)
+    .bind(topicId, src.id, `ingest-${item.external_id}`, item.source_name).run();
+
+  // Si el item trae un summary, registrar como hecho de tipo 'hecho'.
+  if (item.summary && item.summary !== item.title) {
+    await env.DB.prepare(
+      `INSERT INTO topic_facts (topic_id, kind, label, detail, verification, confidence) VALUES (?1, 'hecho', 'Resumen de la fuente', ?2, ?3, ?4)`
+    ).bind(topicId, item.summary, `Fuente: ${item.source_name} (${item.source_category})`, confidenceForCategory(item.source_category)).run();
+  }
+
+  // Marcar item como procesado.
+  await env.DB.prepare(`UPDATE content_ingest SET status = 'procesado' WHERE id = ?1`).bind(item.id).run();
+
+  return { topic_id: topicId, topic_slug: topicSlug, source_slug: item.source_slug };
+}
+
+/** Nivel de confianza básico derivado de la categoría de la fuente (enriquecimiento
+ * simple, sin verificación de primaria real; la UI siempre debe etiquetar como demo
+ * hasta que haya verificación humana).
+ */
+function confidenceForCategory(category) {
+  return category === "primaria" ? "alta" : category === "fact-check" ? "alta" : category === "agencia" ? "media" : "media";
 }
 
 /** Parser mínimo de reglas en lenguaje natural (POC, sin IA externa). */

@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS topics (
   slug TEXT UNIQUE NOT NULL,
   title TEXT NOT NULL,
   summary TEXT,
-  status TEXT NOT NULL DEFAULT 'nuevo' CHECK (status IN ('atencion', 'novedad', 'fondo', 'anonc')),
+  status TEXT NOT NULL DEFAULT 'nuevo' CHECK (status IN ('nuevo', 'atencion', 'novedad', 'fondo', 'anonc')),
   edition TEXT NOT NULL CHECK (edition IN ('matutina', 'cierre')),
   priority INTEGER NOT NULL DEFAULT 50 CHECK (priority BETWEEN 0 AND 100),
   dedup_count INTEGER NOT NULL DEFAULT 0 CHECK (dedup_count >= 0),
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS experiment_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   visitor_id TEXT NOT NULL,
   variant TEXT NOT NULL CHECK (variant IN ('A', 'B')),
-  event TEXT NOT NULL CHECK (event IN ('variant_assigned', 'visit', 'cta_clicked', 'form_started', 'reserve_completed')),
+  event TEXT NOT NULL CHECK (event IN ('variant_assigned', 'visit', 'cta_clicked', 'form_started', 'reserve_completed', 'variant_assignment_error')),
   metadata TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -110,6 +110,30 @@ CREATE TABLE IF NOT EXISTS rate_limit (
   count INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_rate_limit_window ON rate_limit(window_start);
+
+-- ---------- Pipeline de contenido real (v1.0) ----------
+-- Inbox de ingesta: recibe contenido estructurado desde fuera del Worker
+-- (CI/curator/scraper) y lo persiste para que el Worker lo procese de forma
+-- controlada: deducción por título+fuente, enriquecimiento básico, y asociación
+-- a fuentes existentes o creación de fuentes nuevas.
+CREATE TABLE IF NOT EXISTS content_ingest (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  external_id TEXT NOT NULL UNIQUE,
+  source_slug TEXT NOT NULL,
+  source_name TEXT NOT NULL,
+  source_category TEXT NOT NULL CHECK (source_category IN ('agencia', 'fact-check', 'primaria', 'contextual')),
+  source_rigor INTEGER NOT NULL DEFAULT 90 CHECK (source_rigor BETWEEN 0 AND 100),
+  title TEXT NOT NULL,
+  summary TEXT,
+  link TEXT,
+  published_at TEXT,
+  raw TEXT,
+  status TEXT NOT NULL DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'procesado', 'descartado')),
+  note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_content_ingest_source ON content_ingest(source_slug);
+CREATE INDEX IF NOT EXISTS idx_content_ingest_status ON content_ingest(status, created_at);
 
 -- Modo de foco por defecto (fila única)
 INSERT OR IGNORE INTO focus_settings (id) VALUES (1);
