@@ -367,12 +367,11 @@ export default {
         //   source_category, source_rigor?, title, summary?, link?, published_at?,
         //   raw? } ... ] }
         case pathname === "/api/content/ingest" && request.method === "POST": {
-          if (env.PIPELINE_TOKEN && request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
-            return errorResponse(request, 403, "no autorizado");
-          }
-          const hasCors = !!corsHeaders(request);
-          const hasToken = !!request.headers.get("X-Pipeline-Token");
-          if (!hasCors && !hasToken) {
+          if (env.PIPELINE_TOKEN) {
+            if (request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
+              return errorResponse(request, 403, "no autorizado");
+            }
+          } else if (!corsHeaders(request)) {
             return errorResponse(request, 403, "origen no permitido");
           }
           let body;
@@ -395,10 +394,11 @@ export default {
         // GET /api/content/pending — items pendientes de procesado (para revisión).
         // Igual que ingest: protegido por PIPELINE_TOKEN cuando está configurado.
         case pathname === "/api/content/pending" && request.method === "GET": {
-          if (env.PIPELINE_TOKEN && request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
-            return errorResponse(request, 403, "no autorizado");
-          }
-          if (!corsHeaders(request) && !request.headers.get("X-Pipeline-Token")) {
+          if (env.PIPELINE_TOKEN) {
+            if (request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
+              return errorResponse(request, 403, "no autorizado");
+            }
+          } else if (!corsHeaders(request)) {
             return errorResponse(request, 403, "origen no permitido");
           }
           const pending = await env.DB.prepare(
@@ -412,10 +412,11 @@ export default {
         // crea/updates topic+facts+sources, marca como procesado.
         // Protegido por PIPELINE_TOKEN cuando está configurado.
         case /^\/api\/content\/process\/[\w-]+$/.test(pathname) && request.method === "POST": {
-          if (env.PIPELINE_TOKEN && request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
-            return errorResponse(request, 403, "no autorizado");
-          }
-          if (!corsHeaders(request) && !request.headers.get("X-Pipeline-Token")) {
+          if (env.PIPELINE_TOKEN) {
+            if (request.headers.get("X-Pipeline-Token") !== env.PIPELINE_TOKEN) {
+              return errorResponse(request, 403, "no autorizado");
+            }
+          } else if (!corsHeaders(request)) {
             return errorResponse(request, 403, "origen no permitido");
           }
           const id = decodeURIComponent(pathname.split("/").pop());

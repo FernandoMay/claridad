@@ -317,6 +317,47 @@ const run = async () => {
     assert.equal(src.category, "contextual");
   });
 
+  await test("content: sin PIPELINE_TOKEN, ingesto exige origen permitido", async () => {
+    // No hay secreto configurado: un header arbitrario no autoriza y se exige Origin.
+    let r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { "Content-Type": "application/json", "X-Pipeline-Token": "cualquiera" }, body: JSON.stringify({ items: [{ external_id: "sec-1", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "X" }] }) }), env, null);
+    assert.equal(r.status, 403);
+    const { data } = await resJson(r);
+    assert.equal(data.error, "origen no permitido");
+    // Con origen permitido sí se acepta el cuerpo.
+    r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json", "X-Pipeline-Token": "cualquiera" }, body: JSON.stringify({ items: [{ external_id: "sec-2", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "T", summary: "S" }] }) }), env, null);
+    assert.equal(r.status, 201);
+    const { data: d1 } = await resJson(r);
+    assert.equal(d1.summary.ok, 1);
+    const ingestId = d1.ingested[0].id;
+    r = await worker.fetch(req("/api/content/pending", { headers: { Origin: "http://localhost:8787" } }), env, null);
+    const { status: s2, data: d2 } = await resJson(r);
+    assert.equal(s2, 200);
+    assert.ok(d2.pending.some(p => p.id === ingestId));
+  });
+
+  await test("content: con PIPELINE_TOKEN, el token incorrecto gana aunque haya Origin", async () => {
+    const envPipe = { ...env, PIPELINE_TOKEN: "test-pipeline-token" };
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json", "X-Pipeline-Token": "wrong" }, body: JSON.stringify({ items: [{ external_id: "sec-3", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "X" }] }) }), envPipe, null);
+    assert.equal(r.status, 403);
+    const { data } = await resJson(r);
+    assert.equal(data.error, "no autorizado");
+  });
+
+  await test("content: con PIPELINE_TOKEN, token correcto autoriza incluso sin Origin", async () => {
+    const envPipe = { ...env, PIPELINE_TOKEN: "test-pipeline-token" };
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { "Content-Type": "application/json", "X-Pipeline-Token": "test-pipeline-token" }, body: JSON.stringify({ items: [{ external_id: "sec-4", source_slug: "reuters", source_name: "Reuters", source_category: "agencia", title: "T", summary: "S" }] }) }), envPipe, null);
+    assert.equal(r.status, 201);
+    const { data: d1 } = await resJson(r);
+    assert.equal(d1.summary.ok, 1);
+    const ingestId = d1.ingested[0].id;
+    let r2 = await worker.fetch(req("/api/content/pending", { headers: { "X-Pipeline-Token": "test-pipeline-token" } }), envPipe, null);
+    assert.equal(r2.status, 200);
+    const { data: d2 } = await resJson(r2);
+    assert.ok(d2.pending.some(p => p.id === ingestId));
+    let r3 = await worker.fetch(req("/api/content/process/" + ingestId, { method: "POST", headers: { "X-Pipeline-Token": "test-pipeline-token" } }), envPipe, null);
+    assert.equal(r3.status, 200);
+  });
+
   // Pipeline de contenido: autenticación server-to-server con PIPELINE_TOKEN.
   // Los tests explícitos cubren ambos fallos posibles: token ausente/incorrecto
   // (inyección no autorizada) y autorización correcta incluso sin Origin.
