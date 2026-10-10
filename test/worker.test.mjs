@@ -358,6 +358,27 @@ const run = async () => {
     assert.equal(r3.status, 200);
   });
 
+  await test("content: procesar un item genérico (Sumario) lo descarta sin crear tema", async () => {
+    const r = await worker.fetch(req("/api/content/ingest", { method: "POST", headers: { Origin: "http://localhost:8787", "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ external_id: "gen-1", source_slug: "boe", source_name: "Boletín Oficial del Estado", source_category: "primaria", title: "Sumario", summary: "Sumario del diario núm. 252" }] }) }), env, null);
+    assert.equal(r.status, 201);
+    const { data } = await resJson(r);
+    assert.equal(data.summary.ok, 1);
+    const genId = data.ingested[0].id;
+    // Procesar → descartado, sin tema nuevo.
+    const r2 = await worker.fetch(req("/api/content/process/" + genId, { method: "POST", headers: { Origin: "http://localhost:8787" } }), env, null);
+    const { status: s2, data: d2 } = await resJson(r2);
+    assert.equal(s2, 200);
+    assert.ok(d2.processed.skipped === true);
+    const row = await env.DB.prepare(`SELECT status, note FROM content_ingest WHERE id = ?1`).bind(genId).first();
+    assert.equal(row.status, "descartado");
+    const topicsBefore = await env.DB.prepare(`SELECT COUNT(*) AS n FROM topics`).first();
+    // Re-procesar → 409 e2 (ya descartado, no permite re-proceso).
+    const r3 = await worker.fetch(req("/api/content/process/" + genId, { method: "POST", headers: { Origin: "http://localhost:8787" } }), env, null);
+    assert.equal(r3.status, 409);
+    const topicsAfter = await env.DB.prepare(`SELECT COUNT(*) AS n FROM topics`).first();
+    assert.equal(topicsAfter.n, topicsBefore.n);
+  });
+
   // Pipeline de contenido: autenticación server-to-server con PIPELINE_TOKEN.
   // Los tests explícitos cubren ambos fallos posibles: token ausente/incorrecto
   // (inyección no autorizada) y autorización correcta incluso sin Origin.

@@ -639,6 +639,12 @@ async function ingestItem(env, item) {
  * el item como procesado. Es el núcleo del pipeline de contenido real.
  */
 async function processIngestItem(env, item) {
+  // Filtrar ítems genéricos: el sumario diario del BOE no es un tema legible.
+  if (/^sumario/i.test(item.title || "")) {
+    await env.DB.prepare(`UPDATE content_ingest SET status = 'descartado', note = 'item genérico: sumario del diario' WHERE id = ?1`).bind(item.id).run();
+    return { skipped: true, reason: "item genérico (sumario): descartado" };
+  }
+
   // Deduplicación: buscar tema existente con título similar + misma fuente.
   const existing = await env.DB.prepare(
     `SELECT t.id, t.slug, t.title
